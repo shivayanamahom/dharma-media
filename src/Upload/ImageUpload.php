@@ -34,19 +34,27 @@ final class ImageUpload
         $source = $file['tmp_name'];
         $size = filesize($source);
 
+        if ($size === false || $size === 0) {
+            $this->fail('FORMAT');
+        }
+
         if ($size > $this->settings->maxBytes()) {
             $this->fail('SIZE');
         }
 
         $info = @getimagesize($source);
 
-        if (!$info || !isset(self::FORMATS[$info[2]])) {
+        if (!$info || $info[0] <= 0 || $info[1] <= 0 || !isset(self::FORMATS[$info[2]])) {
             $this->fail('FORMAT');
         }
 
         [$width, $height, $format] = $info;
 
-        if ($this->isAnimated($source, $format)) {
+        if (max($width, $height) > 10000 || $width > intdiv(24000000, $height)) {
+            $this->fail('PIXELS');
+        }
+
+        if ($this->isAnimated($source, $format, $size)) {
             $this->fail('ANIMATION');
         }
 
@@ -70,13 +78,18 @@ final class ImageUpload
         [$outputWidth, $outputHeight] = $this->fit($width, $height, $orientation);
         $this->checkMemory($width, $height, $outputWidth, $outputHeight);
 
-        $stream = tmpfile();
+        $relativeFolder = implode('/', array_slice($folders, 1));
+        $stream = @tmpfile();
         if ($stream === false) {
             $this->fail('STORAGE');
         }
 
         try {
             $this->encode($source, $format, $orientation, $outputWidth, $outputHeight, $outputExtension, $stream);
+            if (!fflush($stream)) {
+                $this->fail('STORAGE');
+            }
+
             $stat = fstat($stream);
             $encoded = stream_get_meta_data($stream)['uri'];
 
@@ -94,13 +107,20 @@ final class ImageUpload
 
             $this->checkMediaPolicy($encoded, $stat['size'], $outputExtension);
             $directory = $this->ensureFolders($folders);
-            $filename = $this->write($stream, $stat['size'], $directory, $this->stem($name), $outputExtension);
+            $filename = $this->write(
+                $stream,
+                $stat['size'],
+                $directory,
+                $this->stem($name),
+                $outputExtension,
+                'local-' . $adapter,
+                '/' . $relativeFolder
+            );
         } finally {
             fclose($stream);
         }
 
         $path = implode('/', [...$folders, $filename]);
-        $relativeFolder = implode('/', array_slice($folders, 1));
         $adapterPath = ltrim($relativeFolder . '/' . $filename, '/');
         $value = str_replace(' ', '%20', $path)
             . "#joomlaImage://local-$adapter/$adapterPath?width=$outputWidth&height=$outputHeight";
@@ -130,7 +150,7 @@ final class ImageUpload
         }
     }
 
-    private function isAnimated(string $path, int $format): bool
+    private function isAnimated(string $path, int $format, int $size): bool
     {
         if ($format === IMAGETYPE_JPEG) {
             return false;
@@ -161,8 +181,11 @@ final class ImageUpload
                 }
 
                 $length = unpack('Nlength', $chunk)['length'];
-                if (fseek($input, $length + 4, SEEK_CUR) !== 0) {
-                    break;
+                $position = ftell($input);
+
+                if ($position === false || $length < 0 || $length > $size - $position - 4
+                    || fseek($input, $length + 4, SEEK_CUR) !== 0) {
+                    $this->fail('FORMAT');
                 }
             }
 
@@ -194,8 +217,7 @@ final class ImageUpload
 
         // Leave room for decoder/encoder buffers and concurrent Joomla objects in this request.
         $estimatedBytes = $peakPixels * 5 + 16 * 1048576;
-        if ($sourcePixels > 32000000 || max($width, $height) > 16000
-            || ($memoryLimit > 0 && $estimatedBytes > $memoryLimit - memory_get_usage(true))) {
+        if ($memoryLimit > 0 && $estimatedBytes > $memoryLimit - memory_get_usage(true)) {
             $this->fail('PIXELS');
         }
     }
@@ -288,8 +310,16 @@ final class ImageUpload
         return $stem !== '' ? $stem : 'image';
     }
 
-    private function write($stream, int $size, string $directory, string $stem, string $extension): string
-    {
+    private function write(
+        $stream,
+        int $size,
+        string $directory,
+        string $stem,
+        string $extension,
+        string $adapter,
+        string $folder
+    ): string {
+        $events = new MediaSaveEvents();
         $random = (bool) $this->settings->params->get('random_prefix', 1);
 
         for ($attempt = 0; $attempt < 1000; $attempt++) {
@@ -297,6 +327,11 @@ final class ImageUpload
             $suffix = !$random && $attempt > 0 ? '-' . ($attempt + 1) : '';
             $filename = $prefix . $stem . $suffix . '.' . $extension;
             $path = $directory . '/' . $filename;
+            if (file_exists($path) || is_link($path)) {
+                continue;
+            }
+
+            $file = $events->before($stream, $size, $adapter, $folder, $filename, $extension);
             $target = @fopen($path, 'xb');
 
             if ($target === false) {
@@ -312,6 +347,8 @@ final class ImageUpload
             $closed = fclose($target);
 
             if ($copied === $size && $closed) {
+                $events->after($file);
+
                 return $filename;
             }
 

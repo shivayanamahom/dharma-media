@@ -4,7 +4,7 @@
     <author>Dharma</author>
     <authorUrl>https://github.com/shivayanamahom</authorUrl>
     <creationDate>2026-11</creationDate>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <license>GNU General Public License version 2 or later</license>
     <description>PLG_SYSTEM_DHARMAMEDIA_XML_DESCRIPTION</description>
     <namespace path="src">Dharma\Plugin\System\DharmaMedia</namespace>

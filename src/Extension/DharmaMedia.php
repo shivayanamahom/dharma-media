@@ -3,6 +3,7 @@
 namespace Dharma\Plugin\System\DharmaMedia\Extension;
 
 use Dharma\Plugin\System\DharmaMedia\Upload\ImageUpload;
+use Dharma\Plugin\System\DharmaMedia\Upload\UploadLimit;
 use Dharma\Plugin\System\DharmaMedia\Upload\UploadSettings;
 use Joomla\CMS\Event\Model\PrepareFormEvent;
 use Joomla\CMS\Event\Plugin\AjaxEvent;
@@ -27,16 +28,39 @@ final class DharmaMedia extends CMSPlugin implements SubscriberInterface
 
     public function prepareForm(PrepareFormEvent $event): void
     {
-        $app = $this->getApplication();
         $form = $event->getForm();
         $formName = $form->getName();
 
-        if ($app->isClient('site')) {
-            if ($formName !== 'com_content.article' || !$this->params->get('site_article', 0)) {
-                return;
-            }
-        } elseif (!$app->isClient('administrator')) {
+        if (!$this->allowsForm($formName)) {
             return;
+        }
+
+        FormHelper::addFieldPrefix('Dharma\\Plugin\\System\\DharmaMedia\\Field');
+
+        foreach ($form->getXml()->xpath('//field[not(ancestor::field)]') as $field) {
+            if (strtolower((string) $field['type']) !== 'media'
+                || (isset($field['types']) && trim((string) $field['types']) !== 'images')) {
+                continue;
+            }
+
+            if (!$this->allowsField($formName, (string) $field['name'])) {
+                continue;
+            }
+
+            $field['type'] = 'dharmamedia';
+        }
+    }
+
+    private function allowsForm(string $formName): bool
+    {
+        $app = $this->getApplication();
+
+        if ($app->isClient('site')) {
+            return $formName === 'com_content.article' && (bool) $this->params->get('site_article', 0);
+        }
+
+        if (!$app->isClient('administrator')) {
+            return false;
         }
 
         $scope = match (true) {
@@ -54,34 +78,26 @@ final class DharmaMedia extends CMSPlugin implements SubscriberInterface
             $extra = preg_split('/[\s,]+/', (string) $this->params->get('extra_forms', ''), -1, PREG_SPLIT_NO_EMPTY);
 
             if (!in_array($formName, $extra, true)) {
-                return;
+                return false;
             }
         } elseif ($scope !== 'article' && !$this->params->get($scope, (int) ($scope === 'category'))) {
-            return;
+            return false;
         }
 
-        FormHelper::addFieldPrefix('Dharma\\Plugin\\System\\DharmaMedia\\Field');
+        return true;
+    }
 
-        foreach ($form->getXml()->xpath('//field[not(ancestor::field)]') as $field) {
-            if (strtolower((string) $field['type']) !== 'media'
-                || (isset($field['types']) && trim((string) $field['types']) !== 'images')) {
-                continue;
-            }
-
-            if ($scope === 'article') {
-                $setting = match ((string) $field['name']) {
-                    'image_intro' => 'article_intro',
-                    'image_fulltext' => 'article_full',
-                    default => '',
-                };
-
-                if ($setting === '' || !$this->params->get($setting, 1)) {
-                    continue;
-                }
-            }
-
-            $field['type'] = 'dharmamedia';
+    private function allowsField(string $formName, string $field): bool
+    {
+        if ($formName !== 'com_content.article') {
+            return true;
         }
+
+        return match ($field) {
+            'image_intro' => (bool) $this->params->get('article_intro', 1),
+            'image_fulltext' => (bool) $this->params->get('article_full', 1),
+            default => false,
+        };
     }
 
     public function upload(AjaxEvent $event): void
@@ -90,10 +106,6 @@ final class DharmaMedia extends CMSPlugin implements SubscriberInterface
         $input = $app->getInput();
         $user = $app->getIdentity();
         $this->loadLanguage();
-
-        if (!$app->isClient('administrator') && !($app->isClient('site') && $this->params->get('site_article', 0))) {
-            throw new \RuntimeException(Text::_('JERROR_ALERTNOAUTHOR'), 403);
-        }
 
         if ($input->getMethod() !== 'POST' || $user->guest || !$user->authorise('core.create', 'com_media')) {
             throw new \RuntimeException(Text::_('JERROR_ALERTNOAUTHOR'), 403);
@@ -108,17 +120,22 @@ final class DharmaMedia extends CMSPlugin implements SubscriberInterface
         $field = $input->post->getString('field', '');
         $author = $input->post->getUint('author');
 
-        if (!hash_equals($settings->sign($context, $field, $author), $input->post->getString('signature', ''))) {
+        if (!mb_check_encoding([$context, $field], 'UTF-8')
+            || !$this->allowsForm($context) || !$this->allowsField($context, $field)
+            || !hash_equals($settings->sign($context, $field, $author), $input->post->getString('signature', ''))) {
             throw new \RuntimeException(Text::_('JINVALID_TOKEN_NOTICE'), 403);
         }
 
         try {
-            $event->addResult((new ImageUpload($settings))->save(
+            $limit = new UploadLimit((string) $app->get('tmp_path'), (string) $app->get('secret'));
+            $event->addResult($limit->run((int) $user->id, fn () => (new ImageUpload($settings))->save(
                 $input->files->get('image', [], 'array'),
                 $context,
                 $field,
                 $author ?: (int) $user->id
-            ));
+            )));
+        } catch (\OverflowException $e) {
+            throw new \RuntimeException(Text::_($e->getMessage()), 429);
         } catch (\DomainException $e) {
             throw new \RuntimeException(Text::_($e->getMessage()), 400);
         } catch (\Throwable $e) {
