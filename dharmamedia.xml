@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="plugin" group="system" method="upgrade">
+    <name>PLG_SYSTEM_DHARMAMEDIA</name>
+    <author>Dharma</author>
+    <authorUrl>https://github.com/shivayanamahom</authorUrl>
+    <creationDate>2026-11</creationDate>
+    <version>1.0.0</version>
+    <license>GNU General Public License version 2 or later</license>
+    <description>PLG_SYSTEM_DHARMAMEDIA_XML_DESCRIPTION</description>
+    <namespace path="src">Dharma\Plugin\System\DharmaMedia</namespace>
+    <files>
+        <folder plugin="dharmamedia">services</folder>
+        <folder>src</folder>
+        <folder>layouts</folder>
+    </files>
+    <media destination="plg_system_dharmamedia" folder="media">
+        <filename>joomla.asset.json</filename>
+        <folder>css</folder>
+        <folder>js</folder>
+    </media>
+    <languages folder="language">
+        <language tag="en-GB">en-GB/plg_system_dharmamedia.ini</language>
+        <language tag="en-GB">en-GB/plg_system_dharmamedia.sys.ini</language>
+        <language tag="ru-RU">ru-RU/plg_system_dharmamedia.ini</language>
+        <language tag="ru-RU">ru-RU/plg_system_dharmamedia.sys.ini</language>
+    </languages>
+    <config>
+        <fields name="params" addfieldprefix="Dharma\Plugin\System\DharmaMedia\Field">
+            <fieldset name="basic" label="PLG_SYSTEM_DHARMAMEDIA_TARGETS">
+                <field name="article_intro" type="radio" layout="joomla.form.field.radio.switcher" default="1" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_ARTICLE_INTRO">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+                <field name="article_full" type="radio" layout="joomla.form.field.radio.switcher" default="1" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_ARTICLE_FULL">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+                <field name="category" type="radio" layout="joomla.form.field.radio.switcher" default="1" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_CATEGORY">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+                <field name="tag" type="radio" layout="joomla.form.field.radio.switcher" default="0" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_TAG">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+                <field name="contact" type="radio" layout="joomla.form.field.radio.switcher" default="0" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_CONTACT">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+                <field name="banner" type="radio" layout="joomla.form.field.radio.switcher" default="0" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_BANNER">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+                <field name="newsfeed" type="radio" layout="joomla.form.field.radio.switcher" default="0" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_NEWSFEED">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+                <field name="menu" type="radio" layout="joomla.form.field.radio.switcher" default="0" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_MENU">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+                <field name="site_article" type="radio" layout="joomla.form.field.radio.switcher" default="0" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_SITE_ARTICLE">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+                <field name="extra_forms" type="textarea" rows="3" filter="string"
+                    label="PLG_SYSTEM_DHARMAMEDIA_EXTRA_FORMS" description="PLG_SYSTEM_DHARMAMEDIA_EXTRA_FORMS_DESC" />
+            </fieldset>
+            <fieldset name="processing" label="PLG_SYSTEM_DHARMAMEDIA_PROCESSING">
+                <field name="convert_webp" type="radio" layout="joomla.form.field.radio.switcher" default="1" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_CONVERT_WEBP">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+                <field name="quality" type="number" default="84" min="1" max="100" step="1" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_QUALITY" description="PLG_SYSTEM_DHARMAMEDIA_QUALITY_DESC" />
+                <field name="max_width" type="number" default="2000" min="0" max="16000" step="1" filter="uint"
+                    label="PLG_SYSTEM_DHARMAMEDIA_WIDTH" description="PLG_SYSTEM_DHARMAMEDIA_DIMENSION_DESC" />
+                <field name="max_height" type="number" default="2000" min="0" max="16000" step="1" filter="uint"
+                    label="PLG_SYSTEM_DHARMAMEDIA_HEIGHT" description="PLG_SYSTEM_DHARMAMEDIA_DIMENSION_DESC" />
+                <field name="max_mb" type="number" default="12" min="1" max="64" step="1" filter="uint"
+                    label="PLG_SYSTEM_DHARMAMEDIA_MAX_MB" description="PLG_SYSTEM_DHARMAMEDIA_MAX_MB_DESC" />
+            </fieldset>
+            <fieldset name="storage" label="PLG_SYSTEM_DHARMAMEDIA_STORAGE">
+                <field name="upload_root" type="dharmamediaroot" default="" validate="options"
+                    label="PLG_SYSTEM_DHARMAMEDIA_ROOT" description="PLG_SYSTEM_DHARMAMEDIA_ROOT_DESC">
+                    <option value="">PLG_SYSTEM_DHARMAMEDIA_DEFAULT_ROOT</option>
+                </field>
+                <field name="upload_path" type="dharmamediapath" default="dharma/{year}/{month}" filter="string"
+                    label="PLG_SYSTEM_DHARMAMEDIA_PATH" description="PLG_SYSTEM_DHARMAMEDIA_PATH_DESC" />
+                <field name="random_prefix" type="radio" layout="joomla.form.field.radio.switcher" default="1" filter="integer"
+                    label="PLG_SYSTEM_DHARMAMEDIA_RANDOM_PREFIX" description="PLG_SYSTEM_DHARMAMEDIA_RANDOM_PREFIX_DESC">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+            </fieldset>
+        </fields>
+    </config>
+    <updateservers>
+        <server type="extension" name="Dharma Media" priority="1">https://raw.githubusercontent.com/shivayanamahom/dharma-media/main/updates.xml</server>
+    </updateservers>
+</extension>

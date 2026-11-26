@@ -1,0 +1,18 @@
+{
+  "name": "plg_system_dharmamedia",
+  "version": "1.0.0",
+  "assets": [
+    {
+      "name": "plg_system_dharmamedia.upload",
+      "type": "style",
+      "uri": "plg_system_dharmamedia/uploader.css"
+    },
+    {
+      "name": "plg_system_dharmamedia.upload",
+      "type": "script",
+      "uri": "plg_system_dharmamedia/uploader.js",
+      "dependencies": ["core", "webcomponent.field-media"],
+      "attributes": {"type": "module"}
+    }
+  ]
+}
